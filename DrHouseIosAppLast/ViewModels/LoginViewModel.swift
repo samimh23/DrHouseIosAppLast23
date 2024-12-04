@@ -13,7 +13,7 @@ class LoginViewModel: ObservableObject {
 
     // Private properties
     private var cancellables = Set<AnyCancellable>()
-    private let baseURL = "http://192.168.250.19:3000"
+    private let baseURL = "http://192.168.39.19:3000"
     
     // Initializer
     init() {

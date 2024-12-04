@@ -168,11 +168,18 @@ struct LoginView: View {
                     }
                 }
             }
+            
             .navigationDestination(for: String.self) { route in
                 switch route {
                 case "home":
-                    HomeView(navigationPath: $navigationPath)
-                        .navigationBarBackButtonHidden()
+                    // Check if it's first login
+                    if viewModel.isFirstLogin {
+                        GoalSettingsView(navigationPath: $navigationPath)
+                            .navigationBarBackButtonHidden()
+                    } else {
+                        HomeView(navigationPath: $navigationPath)
+                            .navigationBarBackButtonHidden()
+                    }
                 case "signup":
                     SignUpView()
                 default:

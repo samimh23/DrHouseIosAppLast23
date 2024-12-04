@@ -10,6 +10,8 @@ import SwiftUI
 struct GoalSettingsView: View {
     @StateObject private var viewModel = GoalSettingsViewModel()
     @Binding var navigationPath: NavigationPath
+    @State private var showAlert = false
+    @State private var alertMessage = ""
     
     var body: some View {
         ScrollView {
@@ -22,53 +24,100 @@ struct GoalSettingsView: View {
                 GoalInputField(value: $viewModel.goals.steps,
                              title: "Daily Steps",
                              icon: "figure.walk")
+                
                 GoalInputField(value: $viewModel.goals.water,
                              title: "Water Intake (glasses)",
                              icon: "drop.fill")
+                
                 GoalInputField(value: $viewModel.goals.sleepHours,
                              title: "Sleep Hours",
                              icon: "moon.fill")
+                
                 GoalInputField(value: $viewModel.goals.coffeeCups,
                              title: "Coffee Limit",
                              icon: "cup.and.saucer.fill")
+                
                 GoalInputField(value: $viewModel.goals.workout,
                              title: "Workout Minutes",
                              icon: "figure.walk")
                 
-                Button("Save Goals") {
+                // Save Button
+                Button(action: {
                     Task {
                         await saveGoals()
                     }
+                }) {
+                    HStack {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        }
+                        Text(viewModel.isLoading ? "Saving..." : "Save Goals")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
                 }
-                .buttonStyle(.borderedProminent)
                 .disabled(viewModel.isLoading)
+                .padding(.horizontal)
+                
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
             }
             .padding()
         }
-    }
-    
-    private func saveGoals() async {
-        do {
-            let userId = UserDefaults.standard.string(forKey: "userId") ?? ""
-            try await viewModel.saveGoals(userId: userId)
-            
-            // Update first login status
-            UserDefaults.standard.set(false, forKey: "isFirstLogin")
-            
-            // Navigate to home
-            DispatchQueue.main.async {
-                withAnimation {
-                    navigationPath.removeLast() // Remove goals view
-                    navigationPath.append("home") // Go to home
+        .navigationBarBackButtonHidden(true)
+        .alert("Goals Status", isPresented: $showAlert) {
+            Button("OK") {
+                if viewModel.saveSuccess {
+                    navigateToHome()
                 }
             }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    @MainActor
+    private func saveGoals() async {
+        do {
+            guard let userId = UserDefaults.standard.string(forKey: "userId") else {
+                alertMessage = "Error: User ID not found"
+                showAlert = true
+                return
+            }
+            
+            await viewModel.saveGoals(userId: userId)
+            
+            if viewModel.saveSuccess {
+                UserDefaults.standard.set(false, forKey: "isFirstLogin")
+                alertMessage = "Goals saved successfully!"
+                showAlert = true
+            } else {
+                alertMessage = viewModel.errorMessage ?? "Failed to save goals. Please try again."
+                showAlert = true
+            }
         } catch {
-            // Handle error
-            print("Error saving goals: \(error.localizedDescription)")
+            alertMessage = "Error: \(error.localizedDescription)"
+            showAlert = true
+        }
+    }
+    
+    private func navigateToHome() {
+        withAnimation {
+            navigationPath = NavigationPath()
+            navigationPath.append("home")
         }
     }
 }
 
+// MARK: - GoalInputField View
 struct GoalInputField: View {
     @Binding var value: Int
     let title: String
@@ -78,16 +127,16 @@ struct GoalInputField: View {
         VStack(alignment: .leading) {
             HStack {
                 Image(systemName: icon)
+                    .foregroundColor(.blue)
                 Text(title)
+                    .font(.headline)
             }
-            .font(.headline)
             
             HStack {
                 Slider(value: Binding(
                     get: { Double(value) },
                     set: { value = Int($0) }
                 ), in: 0...getMaxValue(for: title)) { _ in
-                    // Haptic feedback when sliding
                     let impactMed = UIImpactFeedbackGenerator(style: .medium)
                     impactMed.impactOccurred()
                 }
@@ -96,6 +145,7 @@ struct GoalInputField: View {
                 Text("\(value)")
                     .font(.system(.body, design: .rounded))
                     .frame(minWidth: 40)
+                    .foregroundColor(.blue)
             }
         }
         .padding()
